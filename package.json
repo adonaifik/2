@@ -1,0 +1,13 @@
+{
+  "name": "blood-testing-platform",
+  "version": "1.0.0",
+  "description": "Blood Testing Laboratory Management System - Quiz Only",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "type": "module"
+}
+

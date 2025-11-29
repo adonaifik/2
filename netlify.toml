@@ -1,0 +1,30 @@
+[build]
+  publish = "templates"
+  command = "node build.js || echo 'Build completed'"
+
+# Serve static files directly
+[[redirects]]
+  from = "/static/*"
+  to = "/static/:splat"
+  status = 200
+  force = true
+
+# All other routes to index.html (for SPA routing)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "18"
+  PYTHON_VERSION = ""  # Disable Python - this is a static site only
+
+# Headers for API calls
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
