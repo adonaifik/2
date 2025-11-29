@@ -1,20 +1,17 @@
 // BLOOD TESTING - Interactive Laboratory Management System - JavaScript
 
 // API Configuration
-// For quiz-only deployment, API calls will fail gracefully
-// Quiz features work completely client-side without backend
+// This will be replaced by build script in production
+// For local development, uses same origin
+// For production, will be set to Render backend URL
 const API_BASE_URL = (() => {
-    // Check if we're on localhost (for local Flask development)
+    // Check if we're on localhost
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return window.location.origin;
     }
-    // Production: return null to disable API calls (quiz-only mode)
-    // Set this to your Render URL if you deploy the backend later
-    return null; // Quiz-only mode - no backend needed
+    // Production: use Render backend (will be replaced by build script)
+    return 'https://blood-testing-api.onrender.com';
 })();
-
-// Check if backend is available
-const BACKEND_AVAILABLE = API_BASE_URL !== null;
 
 // Global variables
 let currentQuiz = null;
@@ -558,14 +555,6 @@ async function loadDashboardData() {
 }
 
 async function updateStats() {
-    if (!BACKEND_AVAILABLE) {
-        // Quiz-only mode: Use localStorage
-        const localTests = JSON.parse(localStorage.getItem('localTests') || '[]');
-        tests = localTests;
-        document.getElementById('totalTests').textContent = tests.length;
-        return;
-    }
-    
     try {
         // Fetch all tests from API
         const response = await fetch(`${API_BASE_URL}/api/get_all_tests`);
@@ -581,7 +570,6 @@ async function updateStats() {
         console.error('Error fetching stats:', error);
         document.getElementById('totalTests').textContent = tests.length;
     }
-}
     
     // Update learning analytics if available
     const analytics = showLearningAnalytics();
@@ -1675,49 +1663,8 @@ async function handleTestTakerRegistration(e) {
         return;
     }
     
-    // Quiz-only mode: Save to localStorage instead of backend
-    if (!BACKEND_AVAILABLE) {
-        try {
-            // Save to localStorage
-            let localPatients = JSON.parse(localStorage.getItem('localPatients') || '[]');
-            const patientData = {
-                patientId: testTakerData.testTakerId,
-                firstName: testTakerData.firstName,
-                lastName: testTakerData.lastName,
-                dateOfBirth: testTakerData.dateOfBirth,
-                gender: testTakerData.gender,
-                phone: testTakerData.phone,
-                email: testTakerData.email || '',
-                registrationDate: new Date().toISOString()
-            };
-            
-            // Check if already exists
-            if (localPatients.find(p => p.patientId === patientData.patientId)) {
-                showMessage('Test Taker ID already exists', 'error');
-                return;
-            }
-            
-            localPatients.push(patientData);
-            localStorage.setItem('localPatients', JSON.stringify(localPatients));
-            
-            showMessage('Test taker registered successfully! (Saved locally)', 'success');
-            e.target.reset();
-            
-            // Update stats
-            await updateStats();
-            
-            // Add to recent activity
-            addActivity(`Test taker ${patientData.firstName} ${patientData.lastName} registered`);
-            
-        } catch (error) {
-            console.error('Registration error:', error);
-            showMessage('Failed to register test taker. Please try again.', 'error');
-        }
-        return;
-    }
-    
-    // Backend mode: Use API
     try {
+        // Map form field names to API field names
         const patientData = {
             patientId: testTakerData.testTakerId,
             firstName: testTakerData.firstName,
@@ -1745,7 +1692,10 @@ async function handleTestTakerRegistration(e) {
         showMessage('Test taker registered successfully!', 'success');
         e.target.reset();
         
+        // Update stats
         await updateStats();
+        
+        // Add to recent activity
         addActivity(`Test taker ${patientData.firstName} ${patientData.lastName} registered`);
         
     } catch (error) {
@@ -1767,40 +1717,6 @@ async function handleTestSubmission(e) {
         return;
     }
     
-    // Quiz-only mode: Save to localStorage
-    if (!BACKEND_AVAILABLE) {
-        try {
-            let localTests = JSON.parse(localStorage.getItem('localTests') || '[]');
-            const testId = `TEST_${Date.now()}_${testData.testPatientId}`;
-            
-            const test = {
-                testId: testId,
-                patientId: testData.testPatientId,
-                testType: testData.testType,
-                testDate: testData.testDate,
-                doctorName: testData.doctorName || '',
-                notes: testData.notes || '',
-                status: 'pending',
-                submissionDate: new Date().toISOString()
-            };
-            
-            localTests.push(test);
-            localStorage.setItem('localTests', JSON.stringify(localTests));
-            
-            showMessage(`Test request submitted successfully! Test ID: ${testId} (Saved locally)`, 'success');
-            e.target.reset();
-            
-            await updateStats();
-            addActivity(`Test request submitted: ${test.testType.toUpperCase()} for patient ${test.patientId}`);
-            
-        } catch (error) {
-            console.error('Test submission error:', error);
-            showMessage('Failed to submit test request. Please try again.', 'error');
-        }
-        return;
-    }
-    
-    // Backend mode: Use API
     try {
         const response = await fetch(`${API_BASE_URL}/api/submit_test`, {
             method: 'POST',
@@ -1825,7 +1741,10 @@ async function handleTestSubmission(e) {
         showMessage(`Test request submitted successfully! Test ID: ${data.testId}`, 'success');
         e.target.reset();
         
+        // Update stats
         await updateStats();
+        
+        // Add to recent activity
         addActivity(`Test request submitted: ${data.test.testType.toUpperCase()} for patient ${data.test.patientId}`);
         
     } catch (error) {
@@ -1843,34 +1762,6 @@ async function handleSearchResults() {
         return;
     }
     
-    // Quiz-only mode: Search localStorage
-    if (!BACKEND_AVAILABLE) {
-        const localPatients = JSON.parse(localStorage.getItem('localPatients') || '[]');
-        const testTaker = localPatients.find(p => p.patientId === testTakerId);
-        
-        if (!testTaker) {
-            showMessage('Test taker not found', 'error');
-            return;
-        }
-        
-        const localResults = JSON.parse(localStorage.getItem('localResults') || '[]');
-        const testTakerResults = localResults.filter(r => r.testTakerId === testTakerId);
-        const localTests = JSON.parse(localStorage.getItem('localTests') || '[]');
-        const testTakerTests = localTests.filter(t => t.patientId === testTakerId);
-        
-        displayTestTakerResults({
-            testTakerId: testTaker.patientId,
-            firstName: testTaker.firstName,
-            lastName: testTaker.lastName,
-            dateOfBirth: testTaker.dateOfBirth,
-            gender: testTaker.gender,
-            phone: testTaker.phone,
-            email: testTaker.email
-        }, testTakerResults, testTakerTests);
-        return;
-    }
-    
-    // Backend mode: Use API
     try {
         const response = await fetch(`${API_BASE_URL}/api/search_results/${testTakerId}`);
         const data = await response.json();
@@ -1879,6 +1770,7 @@ async function handleSearchResults() {
             throw new Error(data.error || 'Patient not found');
         }
         
+        // Map API response to display format
         const testTaker = {
             testTakerId: data.patient.patientId,
             firstName: data.patient.firstName,
@@ -1889,6 +1781,7 @@ async function handleSearchResults() {
             email: data.patient.email
         };
         
+        // Map test results
         const testTakerResults = data.results.map(result => ({
             id: result.resultId,
             testTakerId: result.patientId,
@@ -1991,12 +1884,6 @@ function displayTestTakerResults(testTaker, testTakerResults, tests = []) {
 
 // Process a test (generate results)
 async function processTest(testId) {
-    // Quiz-only mode: Not available without backend
-    if (!BACKEND_AVAILABLE) {
-        showMessage('Test processing requires backend server. This feature is not available in quiz-only mode.', 'error');
-        return;
-    }
-    
     try {
         const response = await fetch(`${API_BASE_URL}/api/process_test/${testId}`, {
             method: 'POST',
@@ -2036,49 +1923,40 @@ async function loadAnalytics() {
 }
 
 async function updateDemographics() {
-    if (!BACKEND_AVAILABLE) {
-        // Quiz-only mode: Use localStorage
-        const localPatients = JSON.parse(localStorage.getItem('localPatients') || '[]');
-        testTakers = localPatients.map(patient => ({
-            testTakerId: patient.patientId,
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            dateOfBirth: patient.dateOfBirth,
-            gender: patient.gender,
-            phone: patient.phone,
-            email: patient.email
-        }));
-    } else {
-        try {
-            // Fetch all patients from API
-            const response = await fetch(`${API_BASE_URL}/api/get_all_patients`);
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                testTakers = data.patients.map(patient => ({
-                    testTakerId: patient.patientId,
-                    firstName: patient.firstName,
-                    lastName: patient.lastName,
-                    dateOfBirth: patient.dateOfBirth,
-                    gender: patient.gender,
-                    phone: patient.phone,
-                    email: patient.email
-                }));
-            }
-        } catch (error) {
-            console.error('Error fetching demographics:', error);
+    try {
+        // Fetch all patients from API
+        const response = await fetch(`${API_BASE_URL}/api/get_all_patients`);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            testTakers = data.patients.map(patient => ({
+                testTakerId: patient.patientId,
+                firstName: patient.firstName,
+                lastName: patient.lastName,
+                dateOfBirth: patient.dateOfBirth,
+                gender: patient.gender,
+                phone: patient.phone,
+                email: patient.email
+            }));
         }
-    }
-    
-    const maleCount = testTakers.filter(t => t.gender === 'male').length;
-    const femaleCount = testTakers.filter(t => t.gender === 'female').length;
-    const otherCount = testTakers.filter(t => t.gender === 'other').length;
-    
-    document.getElementById('maleCount').textContent = maleCount;
-    document.getElementById('femaleCount').textContent = femaleCount;
-    const otherCountEl = document.getElementById('otherCount');
-    if (otherCountEl) {
-        otherCountEl.textContent = otherCount;
+        
+        const maleCount = testTakers.filter(t => t.gender === 'male').length;
+        const femaleCount = testTakers.filter(t => t.gender === 'female').length;
+        const otherCount = testTakers.filter(t => t.gender === 'other').length;
+        
+        document.getElementById('maleCount').textContent = maleCount;
+        document.getElementById('femaleCount').textContent = femaleCount;
+        const otherCountEl = document.getElementById('otherCount');
+        if (otherCountEl) {
+            otherCountEl.textContent = otherCount;
+        }
+    } catch (error) {
+        console.error('Error fetching demographics:', error);
+        // Fallback to local data
+        const maleCount = testTakers.filter(t => t.gender === 'male').length;
+        const femaleCount = testTakers.filter(t => t.gender === 'female').length;
+        document.getElementById('maleCount').textContent = maleCount;
+        document.getElementById('femaleCount').textContent = femaleCount;
     }
 }
 
